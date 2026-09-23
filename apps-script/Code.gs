@@ -36,7 +36,8 @@ const NUM_FIELDS = [
   { key: 'tds',               label: 'Online TDS (ppm)',             min: '',  max: 150 },
   { key: 'electricalLoad',    label: 'Electrical Load (A)',          min: '',  max: ''  },
   { key: 'tankFillTime',      label: 'Raw Tank Fill Time 0→Full (min)', min: '', max: '' },
-  { key: 'tankEmptyTime',     label: 'Raw Tank Empty Time (min)',    min: '',  max: ''  }
+  { key: 'tankEmptyTime',     label: 'Raw Tank Empty Time (min)',    min: '',  max: ''  },
+  { key: 'voltage',           label: 'Voltage (V)',                  min: '',  max: ''  }
 ];
 const RECOVERY = { key: 'recovery', label: 'Recovery (%)', min: 50, max: 85 };
 
@@ -47,7 +48,8 @@ const HEADERS = [
   'Temperature (°C)', 'Online TDS (ppm)', 'Electrical Load (A)',
   'Antiscalant (Y/N)', 'Cartridge Change (Y/N)',
   'Raw Tank Fill Time 0→Full (min)', 'Raw Tank Empty Time (min)',
-  'Remarks', 'Status', 'Alerts', 'Entry Mode', 'Photos'
+  'Remarks', 'Status', 'Alerts', 'Entry Mode', 'Photos',
+  'Voltage (V)'
 ];
 const COL = {}; HEADERS.forEach((h, i) => COL[h] = i + 1);
 const KEY_TO_HEADER = {
@@ -55,16 +57,29 @@ const KEY_TO_HEADER = {
   inletPressure: 'Inlet Pressure (psi)', pumpPressure: 'Pump Pressure (psi)',
   membranePressure: 'Membrane Pressure (psi)', temperature: 'Temperature (°C)',
   tds: 'Online TDS (ppm)', electricalLoad: 'Electrical Load (A)',
-  tankFillTime: 'Raw Tank Fill Time 0→Full (min)', tankEmptyTime: 'Raw Tank Empty Time (min)'
+  tankFillTime: 'Raw Tank Fill Time 0→Full (min)', tankEmptyTime: 'Raw Tank Empty Time (min)',
+  voltage: 'Voltage (V)'
 };
 
+const MANAGER_EMAILS = 'shamroze.nasir@disrupt.com, kamran.haider@disrupt.com';
+const PORTAL_URL_DEFAULT = 'https://script.google.com/macros/s/AKfycbzFyilnViSbd_Ga4mVeXgfyIV1EcngThFXlRftMgISZEGZv6As2BRRcXjwL4L3ubH03/exec';
+
+/** [key, label, default, note] */
 const GENERAL_DEFAULTS = [
-  ['plantName',   'Plant name (portal title)',            'RO Plant'],
-  ['sites',       'Sites / plants (comma separated)',      '140-H, 141-D'],
-  ['technicians', 'Technicians (comma separated)',         'Technician 1, Technician 2'],
-  ['alertEmails', 'Alert e-mails (comma separated)',       ''],
-  ['emailAlerts', 'Send e-mail on out-of-range reading (Y/N)', 'N'],
-  ['pin',         'Portal access PIN (blank = no PIN)',    '']
+  ['plantName',     'Plant name (portal title)',                 'RO Plant',   'Shown as the portal header title'],
+  ['sites',         'Sites / plants (comma separated)',          '140-H, 141-D', 'Dropdown on the portal. Daily reminder checks every site listed here'],
+  ['technicians',   'Technicians (comma separated)',             'Technician 1, Technician 2', 'Dropdown on the portal (technician can also type a new name)'],
+  ['alertEmails',   'Alert e-mails (comma separated)',           MANAGER_EMAILS, 'Receives out-of-range reading alerts'],
+  ['emailAlerts',   'Send e-mail on out-of-range reading (Y/N)', 'N',          ''],
+  ['pin',           'Portal access PIN (blank = no PIN)',        '',           'Optional. Technicians must enter this PIN to submit'],
+  ['reportEmails',  'Manager report & reminder e-mails (comma separated)', MANAGER_EMAILS, 'Performance reports + daily reminders go here'],
+  ['weeklyReport',  'Weekly performance report every Monday 9 AM (Y/N)', 'Y', 'Last 7 days + lifetime performance'],
+  ['dailyReminder', 'Daily missed-reading reminder (Y/N)',       'Y',          'E-mail if a site has no reading by the check time'],
+  ['reminderHour',  'Daily reminder check time (hour 0–23)',     '11',         'Pakistan time. Re-run installEmailTriggers after changing'],
+  ['cartridgeDays', 'Cartridge change due after (days)',         '30',         'Reminder e-mail when the last cartridge change is older than this'],
+  ['monthlyReport', 'Monthly performance report on the 1st (Y/N)', 'Y',        'Last month + lifetime performance, 1st at 9 AM'],
+  ['adminPassword', 'Admin panel password (portal → Admin)',     'CHANGE_ME',  'Unlocks QR generator + send-report buttons in the portal'],
+  ['portalUrl',     'Portal link (used in e-mails & QR)',        PORTAL_URL_DEFAULT, 'Change if you move the portal (e.g. to Vercel)']
 ];
 
 /* ============================== WEB ENTRY POINTS ============================== */
@@ -96,6 +111,7 @@ function apiRouter(action, payload) {
       case 'config': return { ok: true, data: getConfig_() };
       case 'recent': return { ok: true, data: getRecent_(Number((payload && payload.n) || 5)) };
       case 'submit': return { ok: true, data: submitReading_(payload || {}) };
+      case 'admin':  return { ok: true, data: adminApi_(payload || {}) };
       default: return { ok: false, error: 'Unknown action: ' + action };
     }
   } catch (err) {
@@ -239,6 +255,7 @@ function submitReading_(p) {
   lock.waitLock(20000);
   try {
     const sh = ss_().getSheetByName(CONFIG.SHEET_READINGS);
+    ensureHeaders_(sh);
     sh.appendRow(row);
     const r = sh.getLastRow();
     sh.getRange(r, COL['Submitted At']).setNumberFormat('dd-mmm-yyyy hh:mm');
@@ -253,6 +270,15 @@ function submitReading_(p) {
   }
 
   return { id, status, alerts, recovery: num.recovery, photos: photoLinks.length };
+}
+
+/** Adds any new columns (e.g. Voltage) to the header row without touching existing data. */
+function ensureHeaders_(sh) {
+  const lastCol = sh.getLastColumn();
+  if (lastCol >= HEADERS.length) return;
+  sh.getRange(1, lastCol + 1, 1, HEADERS.length - lastCol).setValues([HEADERS.slice(lastCol)])
+    .setBackground(CONFIG.BRAND).setFontColor('#ffffff').setFontWeight('bold')
+    .setHorizontalAlignment('center').setVerticalAlignment('middle').setWrap(true);
 }
 
 function savePhotos_(photos, id, dateStr) {
@@ -363,7 +389,7 @@ function setupSettings_(ss) {
   out.push(['KEY', 'GENERAL SETTINGS', 'VALUE', '', 'NOTES']);
   GENERAL_DEFAULTS.forEach(g => {
     const prev = existing[g[0]];
-    out.push([g[0], g[1], prev ? prev[2] : g[2], '', '']);
+    out.push([g[0], g[1], (prev && String(prev[2]).trim() !== '') ? prev[2] : g[2], '', g[3] || '']);
   });
   out.push(['', '', '', '', '']);
   out.push(['KEY', 'ALERT LIMITS (per reading)', 'MIN', 'MAX', 'NOTES']);
@@ -380,10 +406,6 @@ function setupSettings_(ss) {
   sh.setColumnWidth(1, 120); sh.setColumnWidth(2, 300); sh.setColumnWidth(3, 260); sh.setColumnWidth(4, 90); sh.setColumnWidth(5, 300);
   sh.getRange(2, 3, GENERAL_DEFAULTS.length, 1).setBackground('#FFF9E6');
   sh.getRange(hdrRows[1] + 1, 3, NUM_FIELDS.length + 1, 2).setBackground('#FFF9E6').setHorizontalAlignment('center');
-  sh.getRange(2, 5).setValue('Shown as the portal header title');
-  sh.getRange(3, 5).setValue('Dropdown on the portal');
-  sh.getRange(4, 5).setValue('Dropdown on the portal (technician can also type a new name)');
-  sh.getRange(7, 5).setValue('Optional. Technicians must enter this PIN to submit');
   sh.getRange(out.length + 2, 2).setValue('⚠ Set the alert limits as per your RO plant OEM / design datasheet. Defaults are generic.').setFontColor('#B00020').setFontStyle('italic');
   sh.setFrozenRows(0);
 }
@@ -472,6 +494,10 @@ function onOpen() {
   SpreadsheetApp.getUi().createMenu('RO Portal')
     .addItem('Run / repair setup', 'setup')
     .addItem('Open portal link', 'showPortalLink_')
+    .addSeparator()
+    .addItem('Turn on daily reminder + monthly report', 'installEmailTriggers')
+    .addItem('Send test: daily reminder', 'testDailyReminder')
+    .addItem('Send performance report now (last 30 days)', 'sendReportNow')
     .addToUi();
 }
 
@@ -481,4 +507,342 @@ function showPortalLink_() {
     ? '<p style="font-family:Arial">Portal URL:</p><p><a target="_blank" href="' + url + '">' + url + '</a></p>'
     : '<p style="font-family:Arial">Not deployed yet. In Apps Script: Deploy → New deployment → Web app.</p>').setWidth(460).setHeight(140);
   SpreadsheetApp.getUi().showModalDialog(html, 'RO Plant Portal');
+}
+
+/* ============================== E-MAIL AUTOMATION ============================== */
+
+/** Run ONCE (or after changing reminderHour). Creates the daily + monthly e-mail schedule. */
+function installEmailTriggers() {
+  const { general } = readSettings_();
+  const handlers = ['dailyCheck', 'monthlyReport', 'weeklyReport'];
+  ScriptApp.getProjectTriggers().forEach(t => { if (handlers.indexOf(t.getHandlerFunction()) >= 0) ScriptApp.deleteTrigger(t); });
+  const hour = Math.min(23, Math.max(0, parseInt(general.reminderHour, 10) || 11));
+  ScriptApp.newTrigger('dailyCheck').timeBased().everyDays(1).atHour(hour).inTimezone(CONFIG.TZ).create();
+  ScriptApp.newTrigger('monthlyReport').timeBased().onMonthDay(1).atHour(9).inTimezone(CONFIG.TZ).create();
+  ScriptApp.newTrigger('weeklyReport').timeBased().onWeekDay(ScriptApp.WeekDay.MONDAY).atHour(9).inTimezone(CONFIG.TZ).create();
+  const msg = 'E-mail schedule ON → daily check ' + hour + ':00, weekly report Monday 9:00, monthly report 1st 9:00 (Asia/Karachi). Recipients: ' + recipients_(general);
+  Logger.log(msg);
+  try { SpreadsheetApp.getActive().toast(msg, 'RO Portal', 8); } catch (e) {}
+}
+
+function recipients_(general) {
+  return general.reportEmails || general.alertEmails || Session.getEffectiveUser().getEmail();
+}
+function portalUrl_(general) { return general.portalUrl || PORTAL_URL_DEFAULT; }
+
+/** All reading rows as objects. */
+function readingRows_() {
+  const sh = ss_().getSheetByName(CONFIG.SHEET_READINGS);
+  const last = sh.getLastRow();
+  if (last < 2) return [];
+  return sh.getRange(2, 1, last - 1, HEADERS.length).getValues()
+    .filter(r => r[0] && r[COL['Reading Date'] - 1] instanceof Date)
+    .map(r => { const o = {}; HEADERS.forEach((h, i) => o[h] = r[i]); return o; });
+}
+const dkey_ = d => Utilities.formatDate(d, CONFIG.TZ, 'yyyy-MM-dd');
+const nice_ = d => Utilities.formatDate(d, CONFIG.TZ, 'dd-MMM-yyyy');
+
+function mailBox_(title, bodyHtml, general) {
+  return '<div style="font-family:Arial,sans-serif;max-width:640px">' +
+    '<div style="background:' + CONFIG.BRAND + ';color:#fff;padding:14px 18px;border-radius:10px 10px 0 0">' +
+    '<div style="font-size:12px;opacity:.85">' + (general.plantName || 'RO Plant') + ' · Workplace Services</div>' +
+    '<div style="font-size:19px;font-weight:bold">' + title + '</div></div>' +
+    '<div style="border:1px solid #eee;border-top:0;padding:16px 18px;border-radius:0 0 10px 10px;font-size:14px;color:#222">' + bodyHtml +
+    '<p style="margin-top:18px"><a href="' + portalUrl_(general) + '" style="background:' + CONFIG.BRAND + ';color:#fff;padding:9px 14px;border-radius:8px;text-decoration:none;font-weight:bold">Open RO portal</a>' +
+    ' &nbsp; <a href="https://docs.google.com/spreadsheets/d/' + CONFIG.SPREADSHEET_ID + '">Open sheet</a></p></div></div>';
+}
+
+/** Daily: e-mail if any site has no reading today, or a cartridge change is overdue. */
+function dailyCheck(e, forceSend) {
+  const force = forceSend === true;
+  const { general } = readSettings_();
+  if (!force && String(general.dailyReminder || 'Y').toUpperCase() !== 'Y') return;
+  const sites = splitList_(general.sites);
+  const rows = readingRows_();
+  const today = dkey_(new Date());
+  const dueDays = parseInt(general.cartridgeDays, 10) || 0;
+
+  const missing = sites.filter(s => !rows.some(r => String(r['Site / Plant']) === s && dkey_(r['Reading Date']) === today));
+  const overdue = [];
+  if (dueDays > 0) sites.forEach(s => {
+    const siteRows = rows.filter(r => String(r['Site / Plant']) === s);
+    if (!siteRows.length) return;
+    const changes = siteRows.filter(r => r['Cartridge Change (Y/N)'] === 'Y').map(r => r['Reading Date'].getTime());
+    const since = changes.length ? Math.max.apply(null, changes) : null;
+    if (since == null) { overdue.push({ site: s, text: 'no cartridge change recorded yet' }); return; }
+    const days = Math.floor((Date.now() - since) / 86400000);
+    if (days > dueDays) overdue.push({ site: s, text: 'last changed ' + nice_(new Date(since)) + ' (' + days + ' days ago, limit ' + dueDays + ')' });
+  });
+
+  if (!missing.length && !overdue.length && !force) return;
+  let html = '';
+  if (missing.length) html += '<p style="color:#B00020;font-weight:bold">⏰ No reading logged today (' + nice_(new Date()) + ') for:</p><ul>' +
+    missing.map(s => '<li><b>' + s + '</b></li>').join('') + '</ul><p>Please ask the technician to submit the daily RO reading.</p>';
+  if (overdue.length) html += '<p style="color:#B45309;font-weight:bold">🔧 Cartridge change due:</p><ul>' +
+    overdue.map(o => '<li><b>' + o.site + '</b> — ' + o.text + '</li>').join('') + '</ul>';
+  if (!html) html = '<p>✅ All sites have today\'s reading and no cartridge change is due.</p>';
+  const subj = missing.length ? '[RO REMINDER] Reading missing today — ' + missing.join(', ')
+    : overdue.length ? '[RO REMINDER] Cartridge change due — ' + overdue.map(o => o.site).join(', ')
+    : '[RO] Daily check — all good';
+  MailApp.sendEmail({ to: recipients_(general), subject: subj, htmlBody: mailBox_('Daily RO reading check', html, general) });
+}
+function testDailyReminder() { dailyCheck(null, true); }
+
+
+/* ============================== ADMIN (portal → Admin, password protected) ============================== */
+
+function adminApi_(p) {
+  const { general } = readSettings_();
+  const pw = String(general.adminPassword || '');
+  if (String(p.pw || '') !== pw) throw new Error('Wrong admin password.');
+  switch (p.op) {
+    case 'login': {
+      const rows = readingRows_().filter(r => String(r['Site / Plant']) !== 'TEST');
+      const last = rows.length ? rows[rows.length - 1] : null;
+      const d30 = Date.now() - 30 * 86400000;
+      return {
+        portalUrl: portalUrl_(general), plantName: general.plantName || 'RO Plant', sites: splitList_(general.sites),
+        recipients: recipients_(general),
+        stats: {
+          total: rows.length,
+          last: last ? nice_(last['Reading Date']) + ' ' + fmtTime_(last['Reading Time']) + ' · ' + last['Technician'] : '—',
+          alerts30: rows.filter(r => r['Status'] === 'ALERT' && r['Reading Date'].getTime() >= d30).length,
+          sheetUrl: 'https://docs.google.com/spreadsheets/d/' + CONFIG.SPREADSHEET_ID
+        }
+      };
+    }
+    case 'sendReport': { const r = sendReportNow(); return { message: 'Performance report sent to ' + r }; }
+    case 'testReminder': { dailyCheck(null, true); return { message: 'Daily check e-mail sent to ' + recipients_(general) }; }
+    default: throw new Error('Unknown admin action');
+  }
+}
+
+/* ============================== PERFORMANCE REPORT (manager e-mail) ============================== */
+
+function weeklyReport() {
+  const { general } = readSettings_();
+  if (String(general.weeklyReport || 'Y').toUpperCase() !== 'Y') return;
+  const end = new Date(); const start = new Date(end.getTime() - 7 * 86400000);
+  sendPerformanceReport_(start, end, 'Weekly', general);
+}
+function monthlyReport() {
+  const { general } = readSettings_();
+  if (String(general.monthlyReport || 'Y').toUpperCase() !== 'Y') return;
+  const now = new Date();
+  const y = Number(Utilities.formatDate(now, CONFIG.TZ, 'yyyy')), m = Number(Utilities.formatDate(now, CONFIG.TZ, 'M'));
+  sendPerformanceReport_(new Date(y, m - 2, 1), new Date(y, m - 1, 0, 23, 59, 59), 'Monthly', general);
+}
+/** Manual / admin button: last 30 days + lifetime. Returns recipients. */
+function sendReportNow() {
+  const { general } = readSettings_();
+  const end = new Date(); const start = new Date(end.getTime() - 30 * 86400000);
+  sendPerformanceReport_(start, end, 'On-demand', general);
+  return recipients_(general);
+}
+function testMonthlyReport() { sendReportNow(); }
+
+/** Metric catalogue. worse: 'up' | 'down' | '' (neutral). */
+const REPORT_METRICS = [
+  { k: 'tds',   h: 'Online TDS (ppm)',              name: 'Online TDS',           unit: 'ppm', dec: 0, worse: 'up' },
+  { k: 'recovery', h: 'Recovery (%)',               name: 'Recovery',             unit: '%',   dec: 1, worse: 'down' },
+  { k: 'dp',    h: '__dp',                          name: 'Membrane ΔP (Pump − Membrane)', unit: 'psi', dec: 0, worse: 'up' },
+  { k: 'flowRate', h: 'Flow Rate (gpm)',            name: 'Permeate flow',        unit: 'gpm', dec: 1, worse: 'down' },
+  { k: 'concentrateFlow', h: 'Concentrate Flow (gpm)', name: 'Concentrate flow',  unit: 'gpm', dec: 1, worse: '' },
+  { k: 'temperature', h: 'Temperature (°C)',        name: 'Water temperature',    unit: '°C',  dec: 1, worse: '' },
+  { k: 'pumpPressure', h: 'Pump Pressure (psi)',    name: 'Pump pressure',        unit: 'psi', dec: 0, worse: '' },
+  { k: 'membranePressure', h: 'Membrane Pressure (psi)', name: 'Membrane pressure', unit: 'psi', dec: 0, worse: '' },
+  { k: 'electricalLoad', h: 'Electrical Load (A)',  name: 'Motor current',        unit: 'A',   dec: 1, worse: 'up' },
+  { k: 'voltage', h: 'Voltage (V)',                 name: 'Supply voltage',       unit: 'V',   dec: 0, worse: '' },
+  { k: 'inletPressure', h: 'Inlet Pressure (psi)',  name: 'Inlet (feed) pressure', unit: 'psi', dec: 0, worse: 'down' },
+  { k: 'tankFillTime', h: 'Raw Tank Fill Time 0→Full (min)', name: 'Raw tank fill time (0→full)', unit: 'min', dec: 0, worse: 'up' },
+  { k: 'tankEmptyTime', h: 'Raw Tank Empty Time (min)', name: 'Raw tank empty time', unit: 'min', dec: 0, worse: '' }
+];
+const REPORT_PARTS = [
+  { title: 'Membrane & Water Quality', icon: '💧', metrics: ['tds', 'recovery', 'dp', 'flowRate', 'concentrateFlow', 'temperature'] },
+  { title: 'High-Pressure Pump & Electrical', icon: '⚙️', metrics: ['pumpPressure', 'membranePressure', 'electricalLoad', 'voltage'] },
+  { title: 'Pre-treatment & Cartridge Filter', icon: '🧰', metrics: ['inletPressure'], extra: 'cartridge' },
+  { title: 'Chemical Dosing (Antiscalant)', icon: '🧪', metrics: [], extra: 'antiscalant' },
+  { title: 'Raw Water Tank', icon: '🛢️', metrics: ['tankFillTime', 'tankEmptyTime'] },
+  { title: 'Reading Discipline', icon: '📋', metrics: [], extra: 'coverage' }
+];
+
+function metricVal_(r, m) {
+  if (m.h === '__dp') { const a = r['Pump Pressure (psi)'], b = r['Membrane Pressure (psi)']; return (a === '' || b === '' || a == null || b == null) ? null : Number(a) - Number(b); }
+  const v = r[m.h]; return (v === '' || v == null || isNaN(v)) ? null : Number(v);
+}
+function mstats_(rows, m) {
+  const v = rows.map(r => metricVal_(r, m)).filter(x => x != null);
+  if (!v.length) return null;
+  return { n: v.length, avg: v.reduce((a, b) => a + b, 0) / v.length, min: Math.min.apply(null, v), max: Math.max.apply(null, v), last: v[v.length - 1] };
+}
+
+function sendPerformanceReport_(start, end, kind, general) {
+  const { thresholds } = readSettings_();
+  const all = readingRows_().filter(r => String(r['Site / Plant']) !== 'TEST')
+    .sort((a, b) => a['Reading Date'] - b['Reading Date'] || String(a['Reading Time']).localeCompare(String(b['Reading Time'])));
+  const label = kind + ' · ' + nice_(start) + ' → ' + nice_(end);
+  const sites = splitList_(general.sites).filter(s => all.some(r => String(r['Site / Plant']) === s));
+  all.forEach(r => { const s = String(r['Site / Plant']); if (s && sites.indexOf(s) < 0) sites.push(s); });
+
+  const C = { ok: '#15803D', okBg: '#E7F6EC', warn: '#B45309', warnBg: '#FEF3C7', bad: '#B91C1C', badBg: '#FEE2E2', na: '#6B7280', naBg: '#F3F4F6' };
+  const pill = st => { const t = { ok: 'HEALTHY', warn: 'WATCH', bad: 'ACTION', na: 'NO DATA' }[st];
+    return '<span style="display:inline-block;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:bold;letter-spacing:.04em;color:' + C[st] + ';background:' + C[st + 'Bg'] + '">' + t + '</span>'; };
+  const fmt = (v, d) => v == null ? '—' : Number(v).toFixed(d);
+  const rank = { na: 0, ok: 1, warn: 2, bad: 3 };
+  const worst = arr => arr.reduce((a, b) => rank[b] > rank[a] ? b : a, 'na');
+  const TD = 'padding:7px 8px;border-bottom:1px solid #EEF0F3;font-size:12.5px;';
+  const TH = 'padding:7px 8px;font-size:10.5px;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;text-align:left;border-bottom:2px solid #E5E7EB;';
+
+  let body = '', overall = [];
+  const now = Date.now();
+  sites.forEach(site => {
+    const S = all.filter(r => String(r['Site / Plant']) === site);
+    const P = S.filter(r => r['Reading Date'] >= new Date(start.getFullYear(), start.getMonth(), start.getDate()) && r['Reading Date'] <= end);
+    const W7 = S.filter(r => r['Reading Date'].getTime() >= now - 7 * 86400000);
+    const D30 = S.filter(r => r['Reading Date'].getTime() >= now - 30 * 86400000);
+    const first = S.length ? S[0]['Reading Date'] : null;
+    const opDays = first ? Math.max(1, Math.round((now - first.getTime()) / 86400000) + 1) : 0;
+
+    // coverage in period
+    const dayset = {}; P.forEach(r => dayset[dkey_(r['Reading Date'])] = 1);
+    const pStart = new Date(Math.max(start.getTime(), first ? first.getTime() : start.getTime()));
+    const missed = []; let periodDays = 0;
+    for (let t = new Date(pStart.getFullYear(), pStart.getMonth(), pStart.getDate()); t <= end; t = new Date(t.getTime() + 86400000)) {
+      periodDays++; if (!dayset[dkey_(t)]) missed.push(Utilities.formatDate(t, CONFIG.TZ, 'dd MMM'));
+    }
+    const coverage = periodDays ? Math.round((periodDays - missed.length) / periodDays * 100) : 0;
+    const pAlerts = P.filter(r => r['Status'] === 'ALERT');
+
+    // metric rows
+    const metricStatus = {};
+    const metricRow = m => {
+      const L = mstats_(S, m), w = mstats_(W7, m), d = mstats_(D30, m);
+      let st = 'na', trend = '—';
+      if (L) {
+        st = 'ok';
+        const t = thresholds[m.k] || {};
+        if ((t.max != null && !isNaN(t.max) && L.last > t.max) || (t.min != null && !isNaN(t.min) && L.last < t.min)) st = 'bad';
+        if (w && L.avg) {
+          const ch = (w.avg - L.avg) / Math.abs(L.avg) * 100;
+          const arrow = Math.abs(ch) < 3 ? '→' : ch > 0 ? '↑' : '↓';
+          const bad = (m.worse === 'up' && ch > 10) || (m.worse === 'down' && ch < -10);
+          trend = '<span style="color:' + (bad ? C.warn : Math.abs(ch) < 3 ? C.na : '#1F2937') + ';font-weight:bold">' + arrow + ' ' + (ch > 0 ? '+' : '') + ch.toFixed(0) + '%</span>';
+          if (bad && st === 'ok') st = 'warn';
+        }
+      }
+      metricStatus[m.k] = st;
+      const dot = '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + C[st] + ';margin-right:6px"></span>';
+      return '<tr><td style="' + TD + '">' + dot + m.name + ' <span style="color:#9CA3AF">(' + m.unit + ')</span></td>' +
+        '<td style="' + TD + 'font-weight:bold">' + fmt(L && L.last, m.dec) + '</td>' +
+        '<td style="' + TD + '">' + fmt(w && w.avg, m.dec) + '</td>' +
+        '<td style="' + TD + '">' + fmt(d && d.avg, m.dec) + '</td>' +
+        '<td style="' + TD + '">' + fmt(L && L.avg, m.dec) + '</td>' +
+        '<td style="' + TD + 'color:#6B7280">' + (L ? fmt(L.min, m.dec) + ' – ' + fmt(L.max, m.dec) : '—') + '</td>' +
+        '<td style="' + TD + '">' + trend + '</td></tr>';
+    };
+    const head = '<tr><th style="' + TH + '">Metric</th><th style="' + TH + '">Latest</th><th style="' + TH + '">7-day</th><th style="' + TH + '">30-day</th><th style="' + TH + '">Lifetime</th><th style="' + TH + '">Min – Max</th><th style="' + TH + '">Trend*</th></tr>';
+
+    // extras
+    const cartDates = S.filter(r => r['Cartridge Change (Y/N)'] === 'Y').map(r => r['Reading Date']);
+    const lastCart = cartDates.length ? cartDates[cartDates.length - 1] : null;
+    const cartAge = lastCart ? Math.floor((now - lastCart.getTime()) / 86400000) : null;
+    const dueDays = parseInt(general.cartridgeDays, 10) || 30;
+    const cartSt = !S.length ? 'na' : lastCart == null ? 'warn' : cartAge > dueDays ? 'bad' : cartAge > dueDays * 0.8 ? 'warn' : 'ok';
+    const antiP = P.length ? Math.round(P.filter(r => r['Antiscalant (Y/N)'] === 'Y').length / P.length * 100) : null;
+    const antiL = S.length ? Math.round(S.filter(r => r['Antiscalant (Y/N)'] === 'Y').length / S.length * 100) : null;
+    const antiSt = antiP == null ? 'na' : antiP === 100 ? 'ok' : antiP >= 90 ? 'warn' : 'bad';
+    const covSt = !periodDays ? 'na' : coverage >= 95 ? 'ok' : coverage >= 80 ? 'warn' : 'bad';
+    const kv = (k, v) => '<tr><td style="' + TD + 'color:#374151">' + k + '</td><td style="' + TD + 'font-weight:bold" colspan="6">' + v + '</td></tr>';
+
+    let partsHtml = '';
+    const partSt = [];
+    REPORT_PARTS.forEach(part => {
+      const rowsHtml = part.metrics.map(k => metricRow(REPORT_METRICS.filter(m => m.k === k)[0])).join('');
+      let extra = '', exSt = [];
+      if (part.extra === 'cartridge') {
+        extra = kv('Last cartridge change', lastCart ? nice_(lastCart) + ' · <span style="color:' + C[cartSt] + '">' + cartAge + ' days ago</span> (due every ' + dueDays + ' days)' : 'Not recorded yet') +
+                kv('Cartridge changes (lifetime)', cartDates.length);
+        exSt.push(cartSt);
+      }
+      if (part.extra === 'antiscalant') {
+        extra = kv('Dosing compliance — this period', antiP == null ? '—' : '<span style="color:' + C[antiSt] + '">' + antiP + '%</span> of readings') +
+                kv('Dosing compliance — lifetime', antiL == null ? '—' : antiL + '%') +
+                kv('Readings without antiscalant (period)', P.filter(r => r['Antiscalant (Y/N)'] === 'N').length);
+        exSt.push(antiSt);
+      }
+      if (part.extra === 'coverage') {
+        extra = kv('Days logged this period', (periodDays - missed.length) + ' / ' + periodDays + ' · <span style="color:' + C[covSt] + '">' + coverage + '%</span>') +
+                kv('Missed days', missed.length ? missed.join(', ') : 'None ✅') +
+                kv('Technicians active (period)', splitList_(P.map(r => r['Technician']).join(',')).filter((v, i, a) => a.indexOf(v) === i).join(', ') || '—') +
+                kv('Total readings (lifetime)', S.length + ' over ' + opDays + ' days');
+        exSt.push(covSt);
+      }
+      const st = worst(part.metrics.map(k => metricStatus[k]).concat(exSt));
+      partSt.push(st);
+      partsHtml += '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:14px 0 0;border:1px solid #E5E7EB;border-radius:12px;border-collapse:separate;overflow:hidden">' +
+        '<tr><td style="padding:11px 14px;background:#FAFAFB;border-bottom:1px solid #E5E7EB"><span style="font-size:15px;font-weight:bold;color:#111827">' + part.icon + ' ' + part.title + '</span>' +
+        '<span style="float:right">' + pill(st) + '</span></td></tr><tr><td style="padding:4px 8px 8px">' +
+        '<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">' + (rowsHtml ? head + rowsHtml : '') + extra + '</table></td></tr></table>';
+    });
+    const siteSt = worst(partSt); overall.push(siteSt);
+
+    // KPI tiles
+    const tds = mstats_(S, REPORT_METRICS[0]), rec = mstats_(P, REPORT_METRICS[1]);
+    const tile = (v, l, col) => '<td width="25%" style="padding:6px"><div style="background:#fff;border:1px solid #F1E4E7;border-radius:12px;padding:12px 8px;text-align:center">' +
+      '<div style="font-size:22px;font-weight:bold;color:' + (col || CONFIG.BRAND_DARK) + '">' + v + '</div><div style="font-size:10.5px;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin-top:3px">' + l + '</div></div></td>';
+    const tiles = '<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>' +
+      tile(tds ? fmt(tds.last, 0) : '—', 'Latest TDS (ppm)') + tile(rec ? fmt(rec.avg, 1) + '%' : '—', 'Avg recovery (period)') +
+      tile(coverage + '%', 'Reading coverage', C[covSt]) + tile(pAlerts.length, 'Alerts (period)', pAlerts.length ? C.bad : C.ok) + '</tr><tr>' +
+      tile(S.length, 'Readings (lifetime)') + tile(opDays, 'Days in operation') + tile(cartAge == null ? '—' : cartAge + 'd', 'Since cartridge change', C[cartSt]) +
+      tile(antiP == null ? '—' : antiP + '%', 'Antiscalant compliance', C[antiSt]) + '</tr></table>';
+
+    // recent alerts
+    const recentAlerts = S.filter(r => r['Status'] === 'ALERT').slice(-8).reverse();
+    const alertsHtml = recentAlerts.length ? '<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-top:6px">' +
+      recentAlerts.map(r => '<tr><td style="' + TD + 'white-space:nowrap;color:#6B7280">' + nice_(r['Reading Date']) + '</td><td style="' + TD + 'color:' + C.bad + '">' + r['Alerts'] + '</td><td style="' + TD + 'color:#6B7280">' + r['Technician'] + '</td></tr>').join('') + '</table>'
+      : '<p style="color:' + C.ok + ';margin:6px 0">No alerts recorded ✅</p>';
+
+    body += '<div style="margin-top:22px"><div style="font-size:18px;font-weight:bold;color:#111827">📍 ' + site + ' &nbsp;' + pill(siteSt) + '</div>' + tiles + partsHtml +
+      '<div style="margin-top:16px;font-size:15px;font-weight:bold;color:#111827">🚨 Recent alerts</div>' + alertsHtml + '</div>';
+  });
+  if (!sites.length) body = '<p style="color:#B91C1C">No readings recorded yet.</p>';
+
+  // Charts from the Dashboard tab → inline images
+  const inline = {}; let chartsHtml = '';
+  try {
+    const dash = ss_().getSheetByName(CONFIG.SHEET_DASHBOARD);
+    (dash ? dash.getCharts() : []).forEach((c, i) => {
+      const blob = c.getAs('image/png').setName('chart' + i + '.png');
+      inline['chart' + i] = blob;
+      chartsHtml += '<img src="cid:chart' + i + '" width="600" style="width:100%;max-width:600px;border:1px solid #E5E7EB;border-radius:10px;margin-top:10px" alt="chart">';
+    });
+  } catch (e) { console.error('Charts', e); }
+
+  const ov = worst(overall);
+  const ovText = { ok: 'All systems healthy', warn: 'Some parameters need watching', bad: 'Action required', na: 'No data yet' }[ov];
+  const html =
+    '<div style="background:#F4F5F7;padding:20px 0;font-family:Segoe UI,Arial,sans-serif;color:#16181D">' +
+    '<table role="presentation" align="center" width="660" cellpadding="0" cellspacing="0" style="max-width:660px;width:100%;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #E5E7EB">' +
+    '<tr><td style="background:linear-gradient(135deg,#A51C30,#7E1424);background-color:#A51C30;padding:24px 26px;color:#fff">' +
+    '<div style="font-size:12px;opacity:.85;letter-spacing:.08em;text-transform:uppercase">Disrupt.com · Workplace Services · Soft FM</div>' +
+    '<div style="font-size:24px;font-weight:bold;margin-top:4px">' + (general.plantName || 'RO Plant') + ' — Performance Report</div>' +
+    '<div style="font-size:13px;opacity:.9;margin-top:4px">' + label + '</div></td></tr>' +
+    '<tr><td style="padding:16px 22px 4px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:' + C[ov + 'Bg'] + ';border-radius:12px"><tr><td style="padding:14px 16px">' +
+    '<div style="font-size:11px;color:' + C[ov] + ';font-weight:bold;letter-spacing:.06em;text-transform:uppercase">Overall status</div>' +
+    '<div style="font-size:19px;font-weight:bold;color:' + C[ov] + ';margin-top:2px">' + ovText + '</div></td></tr></table></td></tr>' +
+    '<tr><td style="padding:0 22px 8px">' + body +
+    (chartsHtml ? '<div style="margin-top:22px;font-size:15px;font-weight:bold;color:#111827">📈 Trends (from Dashboard)</div>' + chartsHtml : '') +
+    '<p style="font-size:11.5px;color:#6B7280;margin-top:16px">*Trend = last 7-day average vs lifetime average. <b style="color:' + C.warn + '">WATCH</b> = moving the wrong way by more than 10%. <b style="color:' + C.bad + '">ACTION</b> = latest reading outside the limits in the Settings tab, cartridge overdue, antiscalant compliance below 90% or reading coverage below 80%.</p>' +
+    '<p style="margin:18px 0 6px"><a href="https://docs.google.com/spreadsheets/d/' + CONFIG.SPREADSHEET_ID + '" style="background:#A51C30;color:#fff;padding:10px 16px;border-radius:9px;text-decoration:none;font-weight:bold;font-size:13px">Open full dashboard</a>' +
+    ' &nbsp; <a href="' + portalUrl_(general) + '" style="color:#A51C30;font-weight:bold;font-size:13px;text-decoration:none">Open RO portal →</a></p>' +
+    '</td></tr><tr><td style="padding:14px 22px;background:#FAFAFB;border-top:1px solid #E5E7EB;font-size:11px;color:#9CA3AF">Automated report · generated ' + nice_(new Date()) + ' ' + Utilities.formatDate(new Date(), CONFIG.TZ, 'HH:mm') + ' PKT · RO Reading Google Sheet</td></tr>' +
+    '</table></div>';
+
+  const emoji = { ok: '🟢', warn: '🟠', bad: '🔴', na: '⚪' }[ov];
+  MailApp.sendEmail({
+    to: recipients_(general),
+    subject: emoji + ' RO Plant ' + kind + ' Performance Report — ' + ovText + ' (' + nice_(start) + ' → ' + nice_(end) + ')',
+    htmlBody: html, inlineImages: inline, name: 'RO Plant Portal'
+  });
+  return html;
 }
