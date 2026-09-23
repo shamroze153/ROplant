@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#A51C30">
+<title>RO Plant · Daily Readings</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script>
+  /* ── Only needed if you host this file OUTSIDE Apps Script (e.g. Vercel).
+        Paste your Web App /exec URL here. Leave blank when served by Apps Script. ── */
+  window.RO_API_URL = 'https://script.google.com/macros/s/AKfycbzFyilnViSbd_Ga4mVeXgfyIV1EcngThFXlRftMgISZEGZv6As2BRRcXjwL4L3ubH03/exec';
+</script>
+<style>
+:root{
+  --brand:#A51C30; --brand-d:#7E1424; --brand-l:#FBEFF1;
+  --bg:#F4F5F7; --card:#FFFFFF; --ink:#16181D; --muted:#6B7280; --line:#E5E7EB;
+  --ok:#15803D; --ok-l:#E7F6EC; --warn:#B45309; --warn-l:#FEF3C7; --bad:#B91C1C; --bad-l:#FEE2E2;
+  --water:#0E7490; --water-l:#E0F2F7;
+  --r:16px; --shadow:0 1px 2px rgba(16,24,40,.05),0 4px 16px rgba(16,24,40,.06);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;font-size:15px}
+button,input,select,textarea{font:inherit;color:inherit}
+.wrap{max-width:760px;margin:0 auto;padding:0 14px 120px}
+
+/* Header */
+.hero{background:linear-gradient(135deg,var(--brand) 0%,var(--brand-d) 100%);color:#fff;padding:18px 16px 54px;position:relative;overflow:hidden}
+.hero::after{content:"";position:absolute;right:-60px;top:-60px;width:220px;height:220px;border-radius:50%;background:rgba(255,255,255,.07)}
+.hero::before{content:"";position:absolute;right:40px;bottom:-90px;width:180px;height:180px;border-radius:50%;background:rgba(255,255,255,.05)}
+.hero-in{max-width:760px;margin:0 auto;display:flex;align-items:center;gap:12px;position:relative;z-index:1}
+.logo{width:44px;height:44px;border-radius:12px;background:rgba(255,255,255,.16);display:grid;place-items:center;flex:none}
+.hero h1{font-size:19px;margin:0;font-weight:800;letter-spacing:-.01em}
+.hero p{margin:2px 0 0;opacity:.85;font-size:13px}
+.pill{margin-left:auto;background:rgba(255,255,255,.16);border-radius:999px;padding:6px 10px;font-size:12px;font-weight:600;display:flex;gap:6px;align-items:center;white-space:nowrap}
+.dot{width:8px;height:8px;border-radius:50%;background:#86EFAC;box-shadow:0 0 0 3px rgba(134,239,172,.25)}
+.dot.off{background:#FCA5A5;box-shadow:0 0 0 3px rgba(252,165,165,.25)}
+
+/* Mode switch */
+.modes{margin:-38px auto 14px;max-width:760px;position:relative;z-index:2;background:var(--card);border-radius:var(--r);box-shadow:var(--shadow);padding:6px;display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.modes button{border:0;background:transparent;border-radius:12px;padding:12px 8px;font-weight:700;display:flex;gap:8px;align-items:center;justify-content:center;cursor:pointer;color:var(--muted)}
+.modes button.on{background:var(--brand-l);color:var(--brand)}
+
+/* Cards */
+.card{background:var(--card);border-radius:var(--r);box-shadow:var(--shadow);padding:16px;margin-bottom:14px}
+.card h2{font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:0 0 12px;display:flex;align-items:center;gap:8px;font-weight:700}
+.card h2 .ic{width:26px;height:26px;border-radius:8px;display:grid;place-items:center;background:var(--brand-l);color:var(--brand)}
+.card h2 .ic.w{background:var(--water-l);color:var(--water)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid.g3{grid-template-columns:1fr 1fr 1fr}
+@media (max-width:520px){.grid.g3{grid-template-columns:1fr 1fr}}
+.full{grid-column:1/-1}
+
+.fld label{display:block;font-size:12.5px;font-weight:600;color:#374151;margin-bottom:6px}
+.fld label .u{color:var(--muted);font-weight:500}
+.fld label .req{color:var(--brand)}
+.in{position:relative;display:flex;align-items:stretch;border:1.5px solid var(--line);border-radius:12px;background:#fff;transition:border-color .15s,box-shadow .15s}
+.in:focus-within{border-color:var(--brand);box-shadow:0 0 0 3px rgba(165,28,48,.12)}
+.in input,.in select,.in textarea{border:0;outline:0;background:transparent;width:100%;padding:12px;min-width:0;font-size:16px}
+.in select{appearance:none;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236B7280' stroke-width='2' fill='none'/%3E%3C/svg%3E") no-repeat right 12px center;padding-right:32px}
+.in textarea{min-height:74px;resize:vertical}
+.in .unit{align-self:center;padding-right:6px;color:var(--muted);font-size:12.5px;font-weight:600;white-space:nowrap}
+.cam{border:0;background:transparent;padding:0 12px;color:var(--brand);cursor:pointer;display:grid;place-items:center;border-left:1.5px solid var(--line)}
+.cam:active{background:var(--brand-l)}
+.in.warn{border-color:#F59E0B;background:#FFFBEB}
+.in.bad{border-color:var(--bad);background:#FEF2F2}
+.in.ocr{animation:flash 1.2s ease}
+@keyframes flash{0%{background:#DCFCE7}100%{background:#fff}}
+.hint{font-size:11.5px;margin-top:5px;min-height:14px;color:var(--muted)}
+.hint.warn{color:var(--warn)} .hint.bad{color:var(--bad);font-weight:600}
+.tag{display:inline-flex;gap:4px;align-items:center;font-size:10.5px;font-weight:700;color:var(--ok);background:var(--ok-l);border-radius:6px;padding:1px 6px;margin-left:6px;vertical-align:1px}
+
+/* Derived tile */
+.derived{display:flex;align-items:center;justify-content:space-between;background:var(--water-l);border-radius:12px;padding:12px 14px;color:var(--water)}
+.derived b{font-size:22px;font-weight:800;white-space:nowrap;margin-left:10px}
+.derived small{display:block;font-size:11.5px;opacity:.8}
+
+/* Y/N toggle */
+.yn{display:grid;grid-template-columns:1fr 1fr;border:1.5px solid var(--line);border-radius:12px;overflow:hidden}
+.yn button{border:0;background:#fff;padding:12px;font-weight:700;cursor:pointer;color:var(--muted)}
+.yn button+button{border-left:1.5px solid var(--line)}
+.yn button.y.on{background:var(--ok-l);color:var(--ok)}
+.yn button.n.on{background:var(--bad-l);color:var(--bad)}
+.yn.req-miss{border-color:var(--bad)}
+
+/* Timers */
+.timer{display:flex;gap:8px;margin-top:8px}
+.tbtn{flex:1;border:1.5px dashed var(--water);background:var(--water-l);color:var(--water);border-radius:10px;padding:9px;font-weight:700;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px}
+.tbtn.run{border-style:solid;background:var(--water);color:#fff}
+.tbtn .clk{font-variant-numeric:tabular-nums}
+
+/* Scan hero */
+.scan-hero{border:2px dashed #E8C3CA;background:linear-gradient(180deg,#FFF 0%,var(--brand-l) 100%);border-radius:var(--r);padding:22px 16px;text-align:center;cursor:pointer}
+.scan-hero .big{width:62px;height:62px;border-radius:18px;background:var(--brand);color:#fff;display:grid;place-items:center;margin:0 auto 10px;box-shadow:0 8px 20px rgba(165,28,48,.3)}
+.scan-hero h3{margin:0 0 4px;font-size:16px}
+.scan-hero p{margin:0;color:var(--muted);font-size:13px}
+
+/* Photos */
+.thumbs{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.thumb{position:relative;width:74px;height:74px;border-radius:10px;overflow:hidden;background:#eee}
+.thumb img{width:100%;height:100%;object-fit:cover}
+.thumb span{position:absolute;left:0;right:0;bottom:0;background:rgba(0,0,0,.55);color:#fff;font-size:9.5px;padding:2px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.thumb button{position:absolute;top:3px;right:3px;width:20px;height:20px;border-radius:50%;border:0;background:rgba(0,0,0,.6);color:#fff;font-size:12px;line-height:20px;padding:0;cursor:pointer}
+.addph{width:74px;height:74px;border-radius:10px;border:1.5px dashed var(--line);background:#fff;color:var(--muted);display:grid;place-items:center;cursor:pointer;font-size:11px;text-align:center}
+
+/* Bottom bar */
+.bar{position:fixed;left:0;right:0;bottom:0;background:rgba(255,255,255,.96);backdrop-filter:blur(8px);border-top:1px solid var(--line);padding:10px 14px calc(10px + env(safe-area-inset-bottom));z-index:20}
+.bar-in{max-width:760px;margin:0 auto;display:flex;align-items:center;gap:12px}
+.prog{flex:1;min-width:0}
+.prog .t{font-size:12px;color:var(--muted);font-weight:600;margin-bottom:5px}
+.prog .b{height:6px;background:#EEE;border-radius:9px;overflow:hidden}
+.prog .b i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--brand),#D9435A);transition:width .3s}
+.submit{border:0;background:var(--brand);color:#fff;border-radius:12px;padding:14px 22px;font-weight:800;font-size:15px;cursor:pointer;display:flex;align-items:center;gap:8px;box-shadow:0 6px 16px rgba(165,28,48,.3)}
+.submit:disabled{opacity:.6}
+
+/* Recent */
+.recent{list-style:none;margin:0;padding:0}
+.recent li{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line);font-size:13px}
+.recent li:first-child{border-top:0}
+.st{font-size:10.5px;font-weight:800;border-radius:6px;padding:3px 7px}
+.st.OK{background:var(--ok-l);color:var(--ok)} .st.ALERT{background:var(--bad-l);color:var(--bad)}
+.recent .m{flex:1;min-width:0}
+.recent .m b{display:block}
+.recent .m small{color:var(--muted);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.recent .v{text-align:right;font-variant-numeric:tabular-nums}
+.recent .v small{color:var(--muted);display:block}
+details summary{cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between}
+details summary::-webkit-details-marker{display:none}
+
+/* Banner */
+.banner{display:none;margin:0 0 14px;padding:12px 14px;border-radius:12px;background:var(--warn-l);color:var(--warn);font-size:13px;font-weight:600;align-items:center;gap:10px}
+.banner.show{display:flex}
+.banner button{margin-left:auto;border:0;background:var(--warn);color:#fff;border-radius:8px;padding:7px 12px;font-weight:700;cursor:pointer}
+
+/* Modal / sheets */
+.ov{position:fixed;inset:0;background:rgba(15,17,22,.55);display:none;align-items:flex-end;justify-content:center;z-index:50}
+.ov.show{display:flex}
+.sheet{background:#fff;width:100%;max-width:560px;border-radius:20px 20px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom));max-height:88vh;overflow:auto;animation:up .22s ease}
+@media (min-width:640px){.ov{align-items:center}.sheet{border-radius:20px}}
+@keyframes up{from{transform:translateY(30px);opacity:0}to{transform:none;opacity:1}}
+.sheet h3{margin:0 0 4px;font-size:17px}
+.sheet .sub{margin:0 0 14px;color:var(--muted);font-size:13px}
+.sheet .prev{width:100%;max-height:200px;object-fit:contain;border-radius:12px;background:#111;margin-bottom:12px}
+.row-assign{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.chip{flex:none;min-width:84px;text-align:center;font-weight:800;font-size:17px;background:var(--brand-l);color:var(--brand);border-radius:10px;padding:10px 8px;font-variant-numeric:tabular-nums}
+.row-assign .in{flex:1}
+.btns{display:flex;gap:8px;margin-top:14px}
+.btn{flex:1;border:1.5px solid var(--line);background:#fff;border-radius:12px;padding:13px;font-weight:700;cursor:pointer}
+.btn.pri{background:var(--brand);border-color:var(--brand);color:#fff}
+.spin{width:18px;height:18px;border:2.5px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:rot .8s linear infinite}
+.spin.dk{border-color:rgba(165,28,48,.2);border-top-color:var(--brand)}
+@keyframes rot{to{transform:rotate(360deg)}}
+.ocr-status{display:flex;gap:10px;align-items:center;color:var(--muted);font-size:13px;padding:10px 0}
+
+/* Success */
+.done{text-align:center;padding:10px 4px}
+.done .badge{width:74px;height:74px;border-radius:50%;margin:0 auto 12px;display:grid;place-items:center}
+.done .badge.ok{background:var(--ok-l);color:var(--ok)} .done .badge.al{background:var(--warn-l);color:var(--warn)}
+.done h3{font-size:20px;margin:0 0 6px}
+.done code{background:#F3F4F6;padding:3px 8px;border-radius:6px;font-size:12.5px}
+.done ul{text-align:left;background:var(--bad-l);color:var(--bad);border-radius:12px;padding:10px 14px 10px 30px;font-size:13px;margin:14px 0 0}
+
+.toast{position:fixed;left:50%;bottom:92px;transform:translateX(-50%) translateY(20px);background:#111827;color:#fff;padding:11px 16px;border-radius:12px;font-size:13.5px;font-weight:600;opacity:0;transition:.25s;z-index:60;pointer-events:none;max-width:90vw;text-align:center}
+.toast.show{opacity:1;transform:translateX(-50%)}
+.loading{display:flex;justify-content:center;padding:40px}
+.foot{text-align:center;color:var(--muted);font-size:11.5px;margin-top:6px}
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="hero-in">
+    <div class="logo">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.7s-6 6.4-6 11a6 6 0 0 0 12 0c0-4.6-6-11-6-11z"/><path d="M9 15a3 3 0 0 0 3 3"/></svg>
+    </div>
+    <div>
+      <h1 id="plantName">RO Plant</h1>
+      <p>Daily Reading Log · Workplace Services</p>
+    </div>
+    <div class="pill"><span class="dot" id="netDot"></span><span id="netTxt">Online</span></div>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="modes" role="tablist">
+    <button class="on" data-mode="Manual" id="mManual">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>Manual entry</button>
+    <button data-mode="OCR" id="mOCR">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>Scan with camera</button>
+  </div>
+
+  <div class="banner" id="queueBanner">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+    <span id="queueTxt"></span><button id="syncBtn">Sync now</button>
+  </div>
+
+  <div id="boot" class="loading"><div class="spin dk"></div></div>
+
+  <form id="form" class="hidden" autocomplete="off" novalidate>
+
+    <!-- OCR scan hero -->
+    <div class="card hidden" id="scanCard">
+      <div class="scan-hero" id="scanHero">
+        <div class="big"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 12h10"/></svg></div>
+        <h3>Scan a display / panel</h3>
+        <p>Take a photo of the digital display or HMI. Detected numbers can be assigned to fields.<br>Tip: tap the <b>camera icon</b> next to any single field to scan just that value.</p>
+      </div>
+    </div>
+
+    <!-- Shift info -->
+    <div class="card">
+      <h2><span class="ic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></span>Reading details</h2>
+      <div class="grid">
+        <div class="fld"><label>Date <span class="req">*</span></label><div class="in"><input type="date" id="date" required></div></div>
+        <div class="fld"><label>Time <span class="req">*</span></label><div class="in"><input type="time" id="time" required></div></div>
+        <div class="fld"><label>Site / Plant <span class="req">*</span></label><div class="in"><select id="site" required></select></div></div>
+        <div class="fld"><label>Technician <span class="req">*</span></label><div class="in"><input id="technician" list="techList" placeholder="Select or type" required><datalist id="techList"></datalist></div></div>
+        <div class="fld full hidden" id="pinWrap"><label>Access PIN <span class="req">*</span></label><div class="in"><input id="pin" type="password" inputmode="numeric" placeholder="Enter portal PIN"></div></div>
+      </div>
+    </div>
+
+    <!-- Flow -->
+    <div class="card">
+      <h2><span class="ic w"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M2 12c2-3 4-3 6 0s4 3 6 0 4-3 6 0"/><path d="M2 18c2-3 4-3 6 0s4 3 6 0 4-3 6 0"/><path d="M2 6c2-3 4-3 6 0s4 3 6 0 4-3 6 0"/></svg></span>Flow</h2>
+      <div class="grid" id="gFlow"></div>
+      <div class="derived" style="margin-top:12px">
+        <div><small>Recovery (auto-calculated)</small>Permeate ÷ (Permeate + Concentrate)</div>
+        <b id="recovery">—</b>
+      </div>
+      <div class="hint" id="h_recovery"></div>
+    </div>
+
+    <!-- Pressure -->
+    <div class="card">
+      <h2><span class="ic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="13" r="8"/><path d="M12 13l4-4M12 3v2"/></svg></span>Pressure</h2>
+      <div class="grid g3" id="gPress"></div>
+    </div>
+
+    <!-- Quality & electrical -->
+    <div class="card">
+      <h2><span class="ic w"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M14 14.8V4a2 2 0 1 0-4 0v10.8a4 4 0 1 0 4 0z"/></svg></span>Water quality &amp; electrical</h2>
+      <div class="grid g3" id="gQual"></div>
+    </div>
+
+    <!-- Chemicals & maintenance -->
+    <div class="card">
+      <h2><span class="ic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 3h6M10 3v6L4.5 18.5A2 2 0 0 0 6.2 21.5h11.6a2 2 0 0 0 1.7-3L14 9V3"/></svg></span>Chemicals &amp; maintenance</h2>
+      <div class="grid">
+        <div class="fld"><label>Antiscalant dosed? <span class="req">*</span></label>
+          <div class="yn" data-yn="antiscalant"><button type="button" class="y">Yes</button><button type="button" class="n">No</button></div><div class="hint" id="h_antiscalant"></div></div>
+        <div class="fld"><label>Cartridge changed? <span class="req">*</span></label>
+          <div class="yn" data-yn="cartridge"><button type="button" class="y">Yes</button><button type="button" class="n">No</button></div><div class="hint"></div></div>
+      </div>
+    </div>
+
+    <!-- Raw water tank -->
+    <div class="card">
+      <h2><span class="ic w"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M4 13h16"/><path d="M8 17h.01"/></svg></span>Raw water tank</h2>
+      <div class="grid" id="gTank"></div>
+      <div class="hint" style="margin-top:8px">Use the stopwatch: tap <b>Start</b> when the tank begins filling / emptying and <b>Stop</b> when full / empty. It keeps running even if you close this page.</div>
+    </div>
+
+    <!-- Remarks + photos -->
+    <div class="card">
+      <h2><span class="ic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>Remarks &amp; photos</h2>
+      <div class="fld"><div class="in"><textarea id="remarks" placeholder="Observations, leaks, noise, backwash done, chemical stock, etc. (optional)"></textarea></div></div>
+      <div class="thumbs" id="thumbs"><label class="addph" id="addPh">+ Photo<br>evidence</label></div>
+    </div>
+
+    <!-- Recent -->
+    <div class="card">
+      <details id="recentBox">
+        <summary><h2 style="margin:0"><span class="ic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg></span>Recent readings</h2><span style="color:var(--muted);font-size:12px">Show ▾</span></summary>
+        <ul class="recent" id="recent" style="margin-top:10px"></ul>
+      </details>
+    </div>
+    <div class="foot">Readings are saved to the <b>RO Reading</b> Google Sheet · Disrupt.com Workplace Services</div>
+  </form>
+</div>
+
+<div class="bar hidden" id="bar">
+  <div class="bar-in">
+    <div class="prog"><div class="t" id="progTxt">0 of 0 readings</div><div class="b"><i id="progBar"></i></div></div>
+    <button class="submit" id="submitBtn" type="button">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg>Submit</button>
+  </div>
+</div>
+
+<!-- Hidden file inputs -->
+<input type="file" id="fileScan" accept="image/*" capture="environment" class="hidden">
+<input type="file" id="fileField" accept="image/*" capture="environment" class="hidden">
+<input type="file" id="filePhoto" accept="image/*" capture="environment" class="hidden">
+
+<!-- Modal -->
+<div class="ov" id="ov"><div class="sheet" id="sheet"></div></div>
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js" defer></script>
+<script>
+(function(){
+'use strict';
+
+/* ─────────────── Field definitions ─────────────── */
+const F = [
+  {key:'flowRate',        label:'Flow Rate (Permeate)', unit:'gpm', grp:'gFlow', req:true},
+  {key:'concentrateFlow', label:'Concentrate Flow',     unit:'gpm', grp:'gFlow', req:true},
+  {key:'inletPressure',   label:'Inlet',                unit:'psi', grp:'gPress',req:true},
+  {key:'pumpPressure',    label:'Pump',                 unit:'psi', grp:'gPress',req:true},
+  {key:'membranePressure',label:'Membrane',             unit:'psi', grp:'gPress',req:true},
+  {key:'temperature',     label:'Temperature',          unit:'°C',  grp:'gQual', req:true},
+  {key:'tds',             label:'Online TDS',           unit:'ppm', grp:'gQual', req:true},
+  {key:'electricalLoad',  label:'Electrical Load',      unit:'A',   grp:'gQual', req:true},
+  {key:'tankFillTime',    label:'Fill time (0 → Full)', unit:'min', grp:'gTank', req:false, timer:true},
+  {key:'tankEmptyTime',   label:'Empty time (Full → 0)',unit:'min', grp:'gTank', req:false, timer:true}
+];
+const $ = id => document.getElementById(id);
+const state = { mode:'Manual', yn:{antiscalant:'',cartridge:''}, photos:[], cfg:null, ocrUsed:false };
+const LS = {
+  get(k,d){ try{ const v=localStorage.getItem('ro_'+k); return v==null?d:JSON.parse(v);}catch(e){return d;} },
+  set(k,v){ try{ localStorage.setItem('ro_'+k, JSON.stringify(v)); return true;}catch(e){return false;} },
+  del(k){ try{ localStorage.removeItem('ro_'+k);}catch(e){} }
+};
+
+/* ─────────────── API (Apps Script or HTTP) ─────────────── */
+function api(action, payload){
+  return new Promise((resolve, reject) => {
+    const done = r => (r && r.ok) ? resolve(r.data) : reject(new Error((r && r.error) || 'Server error'));
+    if (window.google && google.script && google.script.run) {
+      google.script.run.withSuccessHandler(done).withFailureHandler(e => reject(e instanceof Error ? e : new Error(String(e))))
+        .apiRouter(action, payload || {});
+    } else if (window.RO_API_URL) {
+      fetch(window.RO_API_URL, { method:'POST', body: JSON.stringify({action, payload: payload||{}}) })
+        .then(r => r.json()).then(done).catch(reject);
+    } else reject(new Error('No backend configured (set RO_API_URL).'));
+  });
+}
+
+/* ─────────────── Build fields ─────────────── */
+const camSvg = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>';
+F.forEach(f => {
+  const d = document.createElement('div'); d.className = 'fld';
+  d.innerHTML =
+    '<label for="'+f.key+'">'+f.label+' <span class="u">('+f.unit+')</span>'+(f.req?' <span class="req">*</span>':'')+'<span class="tag hidden" id="t_'+f.key+'">OCR</span></label>'+
+    '<div class="in" id="w_'+f.key+'"><input id="'+f.key+'" type="number" inputmode="decimal" step="any" min="0" placeholder="0.0">'+
+    '<span class="unit">'+f.unit+'</span>'+
+    (f.timer?'':'<button type="button" class="cam" data-cam="'+f.key+'" aria-label="Scan '+f.label+'">'+camSvg+'</button>')+'</div>'+
+    (f.timer?'<div class="timer"><button type="button" class="tbtn" data-timer="'+f.key+'"><span>▶ Start</span><span class="clk"></span></button></div>':'')+
+    '<div class="hint" id="h_'+f.key+'"></div>';
+  $(f.grp).appendChild(d);
+  const inp = $(f.key);
+  inp.addEventListener('input', () => { $('t_'+f.key).classList.add('hidden'); validateField(f.key); update(); saveDraft(); });
+});
+
+/* ─────────────── Y/N toggles ─────────────── */
+document.querySelectorAll('.yn').forEach(el => {
+  const k = el.dataset.yn;
+  el.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+    state.yn[k] = b.classList.contains('y') ? 'Y' : 'N';
+    paintYN(); update(); saveDraft();
+  }));
+});
+function paintYN(){
+  document.querySelectorAll('.yn').forEach(el => {
+    const v = state.yn[el.dataset.yn];
+    el.querySelector('.y').classList.toggle('on', v==='Y');
+    el.querySelector('.n').classList.toggle('on', v==='N');
+    el.classList.remove('req-miss');
+  });
+  const h = $('h_antiscalant');
+  h.textContent = state.yn.antiscalant==='N' ? 'Will be flagged as an alert' : '';
+  h.className = 'hint' + (state.yn.antiscalant==='N' ? ' warn' : '');
+}
+
+/* ─────────────── Validation & derived ─────────────── */
+function num(k){ const v = $(k).value; return v===''?null:Number(v); }
+function limitsFor(k){ return (state.cfg && state.cfg.thresholds && state.cfg.thresholds[k]) || {}; }
+function checkLimit(k, v, wrap, hint){
+  const t = limitsFor(k);
+  wrap && wrap.classList.remove('warn','bad'); hint.className='hint'; hint.textContent='';
+  if (v==null || isNaN(v)) return;
+  if (t.max!=null && v>t.max){ wrap&&wrap.classList.add('bad'); hint.className='hint bad'; hint.textContent='⚠ Above limit ('+t.max+')'; }
+  else if (t.min!=null && v<t.min){ wrap&&wrap.classList.add('bad'); hint.className='hint bad'; hint.textContent='⚠ Below limit ('+t.min+')'; }
+  else if (t.min!=null || t.max!=null){ hint.textContent = 'Range: '+(t.min!=null?t.min:'–')+' to '+(t.max!=null?t.max:'–'); }
+}
+function validateField(k){ checkLimit(k, num(k), $('w_'+k), $('h_'+k)); }
+function recovery(){
+  const p = num('flowRate'), c = num('concentrateFlow');
+  if (p==null || c==null || (p+c)<=0) return null;
+  return Math.round(p/(p+c)*1000)/10;
+}
+function update(){
+  const r = recovery();
+  $('recovery').textContent = r==null ? '—' : r+' %';
+  checkLimit('recovery', r, null, $('h_recovery'));
+  const req = F.filter(f=>f.req).map(f=>f.key);
+  let filled = req.filter(k => $(k).value!=='').length + (state.yn.antiscalant?1:0) + (state.yn.cartridge?1:0);
+  const total = req.length + 2;
+  $('progTxt').textContent = filled+' of '+total+' required readings';
+  $('progBar').style.width = Math.round(filled/total*100)+'%';
+}
+
+/* ─────────────── Stopwatch timers (persist) ─────────────── */
+const timers = LS.get('timers', {});
+function fmtClock(ms){ const s=Math.floor(ms/1000); const h=Math.floor(s/3600), m=Math.floor(s%3600/60), x=s%60; return (h?h+':':'')+String(m).padStart(2,'0')+':'+String(x).padStart(2,'0'); }
+function paintTimers(){
+  document.querySelectorAll('[data-timer]').forEach(b => {
+    const k=b.dataset.timer, st=timers[k];
+    b.classList.toggle('run', !!st);
+    b.firstElementChild.textContent = st ? '■ Stop' : '▶ Start';
+    b.lastElementChild.textContent = st ? fmtClock(Date.now()-st) : '';
+  });
+}
+document.querySelectorAll('[data-timer]').forEach(b => b.addEventListener('click', () => {
+  const k=b.dataset.timer;
+  if (timers[k]) {
+    const mins = Math.round((Date.now()-timers[k])/60000*10)/10;
+    delete timers[k]; $(k).value = mins; validateField(k); update(); saveDraft();
+    toast('Recorded '+mins+' min');
+  } else { timers[k]=Date.now(); toast('Stopwatch started'); }
+  LS.set('timers', timers); paintTimers();
+}));
+setInterval(paintTimers, 1000);
+
+/* ─────────────── Image helpers ─────────────── */
+function loadImg(file){
+  return new Promise((res, rej) => { const u=URL.createObjectURL(file); const i=new Image(); i.onload=()=>res(i); i.onerror=rej; i.src=u; });
+}
+function toJpeg(img, max, q){
+  const s = Math.min(1, max/Math.max(img.width, img.height));
+  const c = document.createElement('canvas'); c.width=Math.round(img.width*s); c.height=Math.round(img.height*s);
+  c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+  return c.toDataURL('image/jpeg', q);
+}
+/** Grayscale + auto-invert (LED/LCD light-on-dark) + contrast threshold for better OCR */
+function preprocess(img){
+  const s = Math.min(2, 1600/Math.max(img.width,img.height));
+  const c=document.createElement('canvas'); c.width=Math.round(img.width*s); c.height=Math.round(img.height*s);
+  const x=c.getContext('2d'); x.drawImage(img,0,0,c.width,c.height);
+  const d=x.getImageData(0,0,c.width,c.height), p=d.data; let sum=0;
+  for(let i=0;i<p.length;i+=4){ const g=.299*p[i]+.587*p[i+1]+.114*p[i+2]; p[i]=g; sum+=g; }
+  const mean=sum/(p.length/4), inv = mean<110;
+  for(let i=0;i<p.length;i+=4){ let g=p[i]; if(inv) g=255-g; g = g < (inv?255-mean:mean)*0.92 ? 0 : 255; p[i]=p[i+1]=p[i+2]=g; }
+  x.putImageData(d,0,0); return c;
+}
+function addPhoto(dataUrl, label){
+  if (state.photos.length >= 8) { toast('Max 8 photos'); return; }
+  state.photos.push({dataUrl, label}); paintThumbs();
+}
+function paintThumbs(){
+  const t=$('thumbs'); t.querySelectorAll('.thumb').forEach(n=>n.remove());
+  state.photos.forEach((ph,i) => {
+    const d=document.createElement('div'); d.className='thumb';
+    d.innerHTML='<img src="'+ph.dataUrl+'"><span>'+esc(ph.label)+'</span><button type="button" aria-label="Remove">×</button>';
+    d.querySelector('button').onclick=()=>{ state.photos.splice(i,1); paintThumbs(); };
+    t.insertBefore(d, $('addPh'));
+  });
+}
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* ─────────────── OCR (Tesseract.js, runs on the phone) ─────────────── */
+let worker=null;
+async function getWorker(){
+  if (worker) return worker;
+  if (!window.Tesseract) throw new Error('OCR library not loaded — check internet.');
+  worker = await Tesseract.createWorker('eng');
+  await worker.setParameters({ tessedit_char_whitelist:'0123456789.', tessedit_pageseg_mode:'11' });
+  return worker;
+}
+async function ocrNumbers(img){
+  const w = await getWorker();
+  const canvas = preprocess(img);
+  const { data } = await w.recognize(canvas);
+  let nums = (data.text.match(/\d+(?:\.\d+)?/g) || []).filter(n => n.length<=7);
+  if (!nums.length) { // retry on original image
+    const r2 = await w.recognize(img); nums = (r2.data.text.match(/\d+(?:\.\d+)?/g)||[]).filter(n=>n.length<=7);
+  }
+  return Array.from(new Set(nums));
+}
+function modal(html){ $('sheet').innerHTML=html; $('ov').classList.add('show'); }
+function closeModal(){ $('ov').classList.remove('show'); }
+$('ov').addEventListener('click', e => { if (e.target.id==='ov') closeModal(); });
+
+function ocrBusy(src, title){
+  modal('<h3>'+title+'</h3><p class="sub">Reading numbers from the photo…</p><img class="prev" src="'+src+'"><div class="ocr-status"><div class="spin dk"></div>Running OCR on this device (first scan may take ~10s)</div>');
+}
+function setVal(k, v){
+  $(k).value = v; const w=$('w_'+k); w.classList.remove('ocr'); void w.offsetWidth; w.classList.add('ocr');
+  $('t_'+k).classList.remove('hidden'); state.ocrUsed = true; validateField(k);
+}
+
+// Single-field scan
+let scanTarget=null;
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-cam]'); if (!b) return;
+  scanTarget = b.dataset.cam; $('fileField').value=''; $('fileField').click();
+});
+$('fileField').addEventListener('change', async e => {
+  const file=e.target.files[0]; if(!file||!scanTarget) return;
+  const f = F.find(x=>x.key===scanTarget);
+  try{
+    const img = await loadImg(file); const prev = toJpeg(img, 1024, .72);
+    ocrBusy(prev, 'Scanning '+f.label);
+    const nums = await ocrNumbers(img);
+    addPhoto(prev, f.label);
+    if (!nums.length) { modal('<h3>No number found</h3><p class="sub">Try again closer, with less glare, or type the value.</p><img class="prev" src="'+prev+'"><div class="btns"><button class="btn pri" type="button" id="mClose">OK</button></div>'); $('mClose').onclick=closeModal; return; }
+    if (nums.length===1) { setVal(f.key, nums[0]); update(); saveDraft(); closeModal(); toast(f.label+': '+nums[0]+' '+f.unit); return; }
+    modal('<h3>'+esc(f.label)+'</h3><p class="sub">Several numbers detected — tap the correct one.</p><img class="prev" src="'+prev+'">'+
+      '<div style="display:flex;flex-wrap:wrap;gap:8px">'+nums.map(n=>'<button type="button" class="chip" style="border:0;cursor:pointer" data-pick="'+n+'">'+n+'</button>').join('')+'</div>'+
+      '<div class="btns"><button class="btn" type="button" id="mClose">Cancel</button></div>');
+    $('mClose').onclick=closeModal;
+    $('sheet').querySelectorAll('[data-pick]').forEach(b=>b.onclick=()=>{ setVal(f.key,b.dataset.pick); update(); saveDraft(); closeModal(); });
+  }catch(err){ closeModal(); toast('OCR failed: '+err.message); }
+});
+
+// Full panel scan → assign
+$('scanHero').addEventListener('click', ()=>{ $('fileScan').value=''; $('fileScan').click(); });
+$('fileScan').addEventListener('change', async e => {
+  const file=e.target.files[0]; if(!file) return;
+  try{
+    const img=await loadImg(file); const prev=toJpeg(img,1024,.72);
+    ocrBusy(prev,'Scanning panel');
+    const nums = await ocrNumbers(img);
+    addPhoto(prev,'Panel scan');
+    if(!nums.length){ modal('<h3>No numbers found</h3><p class="sub">Retake the photo straight-on with less glare, or enter values manually.</p><img class="prev" src="'+prev+'"><div class="btns"><button class="btn pri" type="button" id="mClose">OK</button></div>'); $('mClose').onclick=closeModal; return; }
+    const opts = '<option value="">— skip —</option>'+F.map(f=>'<option value="'+f.key+'">'+f.label+' ('+f.unit+')</option>').join('');
+    modal('<h3>Assign detected values</h3><p class="sub">'+nums.length+' number(s) found. Choose which field each one belongs to.</p><img class="prev" src="'+prev+'">'+
+      nums.slice(0,12).map((n,i)=>'<div class="row-assign"><div class="chip">'+n+'</div><div class="in"><select data-as="'+i+'" data-v="'+n+'">'+opts+'</select></div></div>').join('')+
+      '<div class="btns"><button class="btn" type="button" id="mClose">Cancel</button><button class="btn pri" type="button" id="mApply">Apply</button></div>');
+    $('mClose').onclick=closeModal;
+    $('mApply').onclick=()=>{ let c=0; $('sheet').querySelectorAll('[data-as]').forEach(s=>{ if(s.value){ setVal(s.value, s.dataset.v); c++; } }); update(); saveDraft(); closeModal(); toast(c+' value(s) filled'); };
+  }catch(err){ closeModal(); toast('OCR failed: '+err.message); }
+});
+
+// Evidence photo (no OCR)
+$('addPh').addEventListener('click', ()=>{ $('filePhoto').value=''; $('filePhoto').click(); });
+$('filePhoto').addEventListener('change', async e => {
+  const file=e.target.files[0]; if(!file) return;
+  const img=await loadImg(file); addPhoto(toJpeg(img,1280,.72),'Evidence');
+});
+
+/* ─────────────── Mode switch ─────────────── */
+document.querySelectorAll('.modes button').forEach(b => b.addEventListener('click', () => {
+  state.mode=b.dataset.mode;
+  document.querySelectorAll('.modes button').forEach(x=>x.classList.toggle('on', x===b));
+  $('scanCard').classList.toggle('hidden', state.mode!=='OCR');
+  document.querySelectorAll('.cam').forEach(c=>c.style.display = state.mode==='OCR' ? '' : 'none');
+  if (state.mode==='OCR') window.scrollTo({top:0,behavior:'smooth'});
+}));
+
+/* ─────────────── Draft autosave ─────────────── */
+function collect(){
+  const p = { date:$('date').value, time:$('time').value, site:$('site').value, technician:$('technician').value.trim(),
+    pin:$('pin').value, remarks:$('remarks').value.trim(), antiscalant:state.yn.antiscalant, cartridge:state.yn.cartridge,
+    entryMode: state.ocrUsed ? 'OCR + Manual' : 'Manual' };
+  F.forEach(f => p[f.key] = $(f.key).value);
+  return p;
+}
+function saveDraft(){ const d=collect(); delete d.pin; LS.set('draft', d); }
+function loadDraft(){
+  const d=LS.get('draft',null); if(!d) return;
+  F.forEach(f=>{ if(d[f.key]!=null) $(f.key).value=d[f.key]; });
+  if(d.remarks) $('remarks').value=d.remarks;
+  state.yn.antiscalant=d.antiscalant||''; state.yn.cartridge=d.cartridge||'';
+}
+$('remarks').addEventListener('input', saveDraft);
+
+/* ─────────────── Submit + offline queue ─────────────── */
+function validateAll(){
+  const miss=[];
+  ['date','time','site','technician'].forEach(k=>{ if(!$(k).value.trim()) miss.push(k); });
+  if (state.cfg && state.cfg.pinRequired && !$('pin').value) miss.push('pin');
+  F.filter(f=>f.req).forEach(f=>{ if($(f.key).value==='') miss.push(f.key); });
+  ['antiscalant','cartridge'].forEach(k=>{ if(!state.yn[k]){ miss.push(k); document.querySelector('[data-yn="'+k+'"]').classList.add('req-miss'); } });
+  miss.forEach(k=>{ const w=$('w_'+k) || ($(k) && $(k).closest('.in')); if(w){ w.classList.add('bad'); setTimeout(()=>w.classList.remove('bad'),2500);} });
+  return miss;
+}
+function confirmSheet(p){
+  const alerts=[];
+  F.forEach(f=>{ const v=p[f.key]===''?null:Number(p[f.key]), t=limitsFor(f.key); if(v==null) return;
+    if(t.max!=null&&v>t.max) alerts.push(f.label+' '+v+' > '+t.max); if(t.min!=null&&v<t.min) alerts.push(f.label+' '+v+' < '+t.min); });
+  const r=recovery(), tr=limitsFor('recovery');
+  if(r!=null){ if(tr.max!=null&&r>tr.max) alerts.push('Recovery '+r+'% > '+tr.max); if(tr.min!=null&&r<tr.min) alerts.push('Recovery '+r+'% < '+tr.min); }
+  if(p.antiscalant==='N') alerts.push('Antiscalant not dosed');
+  return alerts;
+}
+$('submitBtn').addEventListener('click', () => {
+  const miss = validateAll();
+  if (miss.length) { toast('Please complete '+miss.length+' required field(s)'); const first=$(miss[0])||document.querySelector('[data-yn="'+miss[0]+'"]'); first && first.scrollIntoView({behavior:'smooth',block:'center'}); return; }
+  const p = collect();
+  const alerts = confirmSheet(p);
+  const rows = F.map(f=>'<tr><td style="padding:5px 0;color:#6B7280">'+f.label+'</td><td style="text-align:right;font-weight:700">'+(p[f.key]===''?'—':esc(p[f.key])+' '+f.unit)+'</td></tr>').join('');
+  modal('<h3>Confirm reading</h3><p class="sub">'+esc(p.site)+' · '+esc(p.date)+' '+esc(p.time)+' · '+esc(p.technician)+'</p>'+
+    (alerts.length?'<div class="done" style="padding:0"><ul style="margin:0 0 12px">'+alerts.map(a=>'<li>'+esc(a)+'</li>').join('')+'</ul></div>':'')+
+    '<table style="width:100%;font-size:13.5px;border-collapse:collapse">'+rows+
+    '<tr><td style="padding:5px 0;color:#6B7280">Recovery</td><td style="text-align:right;font-weight:700">'+(recovery()==null?'—':recovery()+' %')+'</td></tr>'+
+    '<tr><td style="padding:5px 0;color:#6B7280">Antiscalant / Cartridge</td><td style="text-align:right;font-weight:700">'+p.antiscalant+' / '+p.cartridge+'</td></tr>'+
+    '<tr><td style="padding:5px 0;color:#6B7280">Photos</td><td style="text-align:right;font-weight:700">'+state.photos.length+'</td></tr></table>'+
+    '<div class="btns"><button class="btn" type="button" id="mClose">Edit</button><button class="btn pri" type="button" id="mSend">Confirm &amp; save</button></div>');
+  $('mClose').onclick=closeModal;
+  $('mSend').onclick=()=>send(p);
+});
+
+async function send(p){
+  const payload = Object.assign({}, p, { photos: state.photos.map(x=>({dataUrl:x.dataUrl,label:x.label})) });
+  const btn=$('mSend'); btn.disabled=true; btn.innerHTML='<div class="spin" style="margin:0 auto"></div>';
+  try{
+    const res = await api('submit', payload);
+    success(res);
+  }catch(err){
+    const msg = String(err.message||err);
+    if (/PIN|required|must be/i.test(msg)) { closeModal(); toast(msg); return; }
+    // Network / server issue → queue locally
+    const q=LS.get('queue',[]); q.push(payload);
+    if (!LS.set('queue',q)) { q[q.length-1].photos=[]; LS.set('queue',q); }
+    paintQueue(); resetForm();
+    modal('<div class="done"><div class="badge al"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 9v4M12 17h.01"/><circle cx="12" cy="12" r="10"/></svg></div><h3>Saved on this phone</h3><p class="sub">Could not reach the server ('+esc(msg)+'). The reading is queued and will sync automatically when online.</p><div class="btns"><button class="btn pri" type="button" id="mClose">OK</button></div></div>');
+    $('mClose').onclick=closeModal;
+  }
+}
+function success(res){
+  resetForm();
+  const ok = res.status==='OK';
+  modal('<div class="done"><div class="badge '+(ok?'ok':'al')+'">'+
+    (ok?'<svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg>'
+       :'<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>')+
+    '</div><h3>'+(ok?'Reading saved':'Saved — with alerts')+'</h3><p class="sub">Entry <code>'+esc(res.id)+'</code>'+(res.recovery!==''&&res.recovery!=null?' · Recovery '+res.recovery+'%':'')+(res.photos?' · '+res.photos+' photo(s)':'')+'</p>'+
+    (res.alerts && res.alerts.length ? '<ul>'+res.alerts.map(a=>'<li>'+esc(a)+'</li>').join('')+'</ul><p class="sub" style="margin-top:10px">Please inform your supervisor.</p>' : '')+
+    '<div class="btns"><button class="btn pri" type="button" id="mClose">New reading</button></div></div>');
+  $('mClose').onclick=closeModal;
+  refreshRecent();
+}
+function resetForm(){
+  F.forEach(f=>{ $(f.key).value=''; $('t_'+f.key).classList.add('hidden'); validateField(f.key); });
+  $('remarks').value=''; state.yn={antiscalant:'',cartridge:''}; state.photos=[]; state.ocrUsed=false;
+  paintYN(); paintThumbs(); setNow(); LS.del('draft'); update();
+}
+function paintQueue(){
+  const q=LS.get('queue',[]);
+  $('queueBanner').classList.toggle('show', q.length>0);
+  $('queueTxt').textContent = q.length+' reading(s) waiting to sync';
+}
+let syncing=false;
+async function syncQueue(){
+  if(syncing) return; const q=LS.get('queue',[]); if(!q.length) return; syncing=true;
+  const left=[];
+  for (const item of q){ try{ await api('submit', item); } catch(e){ left.push(item); } }
+  LS.set('queue', left); syncing=false; paintQueue();
+  if (left.length < q.length) { toast((q.length-left.length)+' queued reading(s) synced'); refreshRecent(); }
+}
+$('syncBtn').onclick=syncQueue;
+
+/* ─────────────── Recent ─────────────── */
+function paintRecent(list){
+  $('recent').innerHTML = (list && list.length) ? list.map(r=>
+    '<li><span class="st '+esc(r.status)+'">'+esc(r.status)+'</span><div class="m"><b>'+esc(r.date)+' · '+esc(r.time)+'</b><small>'+esc(r.technician)+' · '+esc(r.site)+(r.alerts?' · '+esc(r.alerts):'')+'</small></div>'+
+    '<div class="v"><b>'+esc(r.tds)+'</b><small>ppm TDS</small></div></li>').join('')
+    : '<li style="color:var(--muted)">No readings yet.</li>';
+}
+function refreshRecent(){ api('recent',{n:5}).then(paintRecent).catch(()=>{}); }
+
+/* ─────────────── Misc ─────────────── */
+function setNow(){
+  const d=new Date(), z=n=>String(n).padStart(2,'0');
+  $('date').value = d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate());
+  $('time').value = z(d.getHours())+':'+z(d.getMinutes());
+}
+let tt; function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(tt); tt=setTimeout(()=>t.classList.remove('show'),2600); }
+function net(){ const on=navigator.onLine; $('netDot').classList.toggle('off',!on); $('netTxt').textContent=on?'Online':'Offline'; if(on) syncQueue(); }
+window.addEventListener('online',net); window.addEventListener('offline',net);
+['site','technician'].forEach(k=>$(k).addEventListener('change',()=>LS.set(k,$(k).value)));
+
+/* ─────────────── Boot ─────────────── */
+function boot(cfg){
+  state.cfg = cfg; LS.set('cfg', cfg);
+  $('plantName').textContent = cfg.plantName || 'RO Plant';
+  document.title = (cfg.plantName||'RO Plant')+' · Daily Readings';
+  $('site').innerHTML = (cfg.sites.length?cfg.sites:['Main']).map(s=>'<option>'+esc(s)+'</option>').join('');
+  $('techList').innerHTML = cfg.technicians.map(t=>'<option value="'+esc(t)+'">').join('');
+  const ls=LS.get('site',''), lt=LS.get('technician','');
+  if (ls && cfg.sites.indexOf(ls)>=0) $('site').value=ls;
+  if (lt) $('technician').value=lt;
+  $('pinWrap').classList.toggle('hidden', !cfg.pinRequired);
+  setNow(); loadDraft(); paintYN(); paintTimers();
+  F.forEach(f=>validateField(f.key)); update();
+  paintRecent(cfg.recent);
+  document.querySelectorAll('.cam').forEach(c=>c.style.display='none');
+  $('boot').classList.add('hidden'); $('form').classList.remove('hidden'); $('bar').classList.remove('hidden');
+  paintQueue(); net();
+}
+api('config').then(boot).catch(err => {
+  // Offline boot using cached config
+  const c = LS.get('cfg', null);
+  if (c) { boot(c); toast('Offline — using saved settings'); }
+  else $('boot').innerHTML = '<div class="card" style="text-align:center"><b>Could not load portal</b><p style="color:#6B7280">'+esc(err.message)+'</p></div>';
+});
+})();
+</script>
+</body>
+</html>
